@@ -4,6 +4,7 @@ This folder contains the decision history, architecture notes, and context behin
 
 ## Documents
 
+- [Vision & Founding Story](vision-and-founding-story.md) — Why Sillage exists, who it's for, and the market opportunity
 - [2026-05-30 — Infrastructure Setup](2026-05-30-infrastructure-setup.md) — How the app was moved off Lovable and set up as an independent product
 
 ## How to use this folder
