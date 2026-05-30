@@ -1,5 +1,3 @@
-// Re-export the single shared Supabase client so OAuth sessions set by
-// the lovable integration are immediately visible to the AuthProvider.
 // Cast to `any` to preserve the loose typing the rest of the app expects
 // (the generated Database types are stricter about Json columns).
 import { supabase as typedSupabase } from "@/integrations/supabase/client";

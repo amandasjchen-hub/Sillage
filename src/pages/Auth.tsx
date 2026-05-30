@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { Navigate } from "react-router-dom";
 import { supabase } from "@/lib/supabase";
-import { lovable } from "@/integrations/lovable/index";
 import { useAuth } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -86,14 +85,11 @@ export default function Auth() {
         <button
           type="button"
           onClick={async () => {
-            const result = await lovable.auth.signInWithOAuth("google", {
-              redirect_uri: window.location.origin,
+            const { error } = await supabase.auth.signInWithOAuth({
+              provider: "google",
+              options: { redirectTo: window.location.origin },
             });
-            if (result.error) toast.error(result.error.message || "Could not sign in with Google");
-            if (!result.error && !result.redirected) {
-              sessionStorage.setItem("sillage_welcomed", "1");
-              window.location.replace("/");
-            }
+            if (error) toast.error(error.message || "Could not sign in with Google");
           }}
           className="mt-6 w-full h-12 bg-card border border-rule/60 text-ink hover:bg-muted/60 transition-colors rounded-full text-[13px] lowercase flex items-center justify-center gap-3"
         >
