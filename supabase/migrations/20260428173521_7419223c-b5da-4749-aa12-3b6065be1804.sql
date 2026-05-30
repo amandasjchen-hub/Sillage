@@ -1,0 +1,3 @@
+UPDATE public.perfumes SET image_url = 'https://media.parfumo.com/perfume_imagery/22/2298d8-lilyphea-diptyque_1200.jpg', image_source = 'web' WHERE id = '87e6cba1-c23d-403f-b4c4-f6a5b924a24b';
+UPDATE public.perfumes SET image_url = 'https://media-photos.depop.com/b1/31812501/1622756206_997ebbcd92884f59aae0fe112bb5fe52/P0.jpg', image_source = 'web' WHERE id = '5d375af0-1f9c-4489-ab26-afdc601bd5ca';
+UPDATE public.perfumes SET image_url = 'https://fimgs.net/mdimg/perfume/social.103100.jpg', image_source = 'web' WHERE id = 'f23db232-e52d-4452-b250-8118222fa72e';

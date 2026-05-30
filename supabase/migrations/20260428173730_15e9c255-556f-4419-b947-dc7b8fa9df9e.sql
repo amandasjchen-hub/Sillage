@@ -1,0 +1,3 @@
+UPDATE public.perfumes SET image_url = 'https://www.diptyqueparis.com/media/wysiwyg/Diptyque_Orpheon01_Horizontal.jpg', image_source = 'brand' WHERE id = '5d375af0-1f9c-4489-ab26-afdc601bd5ca';
+UPDATE public.perfumes SET image_url = 'https://www.diptyqueparis.com/media/wysiwyg/HP_EauPapier_23/banner_edp_boise_.png', image_source = 'brand' WHERE id = '87e6cba1-c23d-403f-b4c4-f6a5b924a24b';
+UPDATE public.perfumes SET image_url = 'https://madetlen.com/files/resize/outside/1500-1500-perfume-red-musc_5d32b2620aae709192f2be0c2c048342.jpeg', image_source = 'brand' WHERE id = 'f23db232-e52d-4452-b250-8118222fa72e';

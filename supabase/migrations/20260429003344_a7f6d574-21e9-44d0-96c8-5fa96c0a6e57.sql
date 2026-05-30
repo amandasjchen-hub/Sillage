@@ -1,0 +1,1 @@
+ALTER TABLE public.perfumes ADD COLUMN IF NOT EXISTS image_url_nobg text;

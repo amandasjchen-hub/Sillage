@@ -1,0 +1,283 @@
+@import url('https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,400;1,9..144,300&family=Inter:wght@300;400;500&family=Archivo+Black&family=Inter+Tight:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@300;400;500;600;700&family=Manrope:wght@300;400;500;600&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ======================================================================
+   THEME SYSTEM
+   Two themes live here. Switch by setting `data-theme` on <html>.
+   - maison  — original moodboard editorial (oatmeal, taupe, espresso)
+   - ledger  — cool minimalism, mono type, hard edges
+   Components only use semantic tokens, so swapping data-theme reskins the app.
+   ====================================================================== */
+
+@layer base {
+  /* default = maison */
+  :root,
+  [data-theme="maison"] {
+    --background: 36 32% 95%;          /* popover-light cream */
+    --foreground: 24 18% 14%;
+
+    --card: 36 32% 95%;
+    --card-foreground: 24 18% 14%;
+
+    --popover: 36 32% 95%;
+    --popover-foreground: 24 18% 14%;
+
+    --primary: 24 22% 16%;
+    --primary-foreground: 36 30% 96%;
+
+    --secondary: 30 18% 82%;
+    --secondary-foreground: 24 18% 16%;
+
+    --muted: 32 18% 86%;
+    --muted-foreground: 25 10% 40%;
+
+    --accent: 22 28% 32%;
+    --accent-foreground: 36 30% 96%;
+
+    --destructive: 5 40% 38%;
+    --destructive-foreground: 36 30% 96%;
+
+    --border: 28 14% 76%;
+    --input: 28 14% 76%;
+    --ring: 24 22% 16%;
+
+    --radius: 0.625rem;
+
+    --paper: 36 32% 95%;
+    --ink: 24 18% 14%;
+    --ink-soft: 25 10% 40%;
+    --ink-mute: 28 8% 58%;
+    --rule: 28 14% 74%;
+    --tan: 30 24% 72%;
+    --espresso: 22 28% 24%;
+
+    --font-display: ui-serif, Georgia, Cambria, 'Times New Roman', Times, serif;
+    --font-body: 'Inter', system-ui, sans-serif;
+
+    --shadow-tile: 0 1px 2px hsl(24 18% 14% / 0.05);
+
+    --sidebar-background: 34 28% 88%;
+    --sidebar-foreground: 24 18% 14%;
+    --sidebar-primary: 24 22% 16%;
+    --sidebar-primary-foreground: 36 30% 96%;
+    --sidebar-accent: 32 22% 82%;
+    --sidebar-accent-foreground: 24 18% 14%;
+    --sidebar-border: 28 16% 70%;
+    --sidebar-ring: 24 22% 16%;
+  }
+
+  /* LEDGER — cool minimalism, mono type, hard edges */
+  [data-theme="ledger"] {
+    --background: 0 0% 98%;            /* zinc-50 */
+    --foreground: 220 18% 12%;         /* slate near-black */
+
+    --card: 210 20% 98%;               /* near-white with cool cast */
+    --card-foreground: 220 18% 12%;
+
+    --popover: 210 20% 98%;
+    --popover-foreground: 220 18% 12%;
+
+    --primary: 220 18% 12%;
+    --primary-foreground: 210 20% 98%;
+
+    --secondary: 218 12% 84%;
+    --secondary-foreground: 220 18% 12%;
+
+    --muted: 218 12% 88%;
+    --muted-foreground: 220 8% 38%;
+
+    --accent: 220 18% 12%;
+    --accent-foreground: 210 20% 98%;
+
+    --destructive: 0 60% 42%;
+    --destructive-foreground: 210 20% 98%;
+
+    --border: 220 10% 70%;
+    --input: 220 10% 70%;
+    --ring: 220 18% 12%;
+
+    --radius: 0rem;                    /* hard edges — ledger */
+
+    --paper: 0 0% 98%;
+    --ink: 220 18% 12%;
+    --ink-soft: 220 10% 32%;
+    --ink-mute: 220 6% 52%;
+    --rule: 220 10% 68%;
+    --tan: 218 12% 78%;
+    --espresso: 220 18% 12%;
+
+    --font-display: 'JetBrains Mono', 'Courier New', monospace;
+    --font-body: 'JetBrains Mono', 'Courier New', monospace;
+    --font-fine: 'Inter Tight', 'Inter', system-ui, sans-serif;
+
+    --shadow-tile: 0 1px 2px hsl(24 18% 14% / 0.05);
+
+    --sidebar-background: 36 22% 93%;
+    --sidebar-foreground: 24 18% 14%;
+    --sidebar-primary: 22 28% 16%;
+    --sidebar-primary-foreground: 38 28% 96%;
+    --sidebar-accent: 32 16% 84%;
+    --sidebar-accent-foreground: 24 18% 14%;
+    --sidebar-border: 30 12% 72%;
+    --sidebar-ring: 22 28% 16%;
+  }
+
+  /* ACCORD — black canvas, white ink, mono type, hard edges (welcome-screen vibe) */
+  [data-theme="accord"] {
+    --background: 0 0% 4%;             /* near-black */
+    --foreground: 0 0% 96%;            /* near-white */
+
+    --card: 0 0% 7%;
+    --card-foreground: 0 0% 96%;
+
+    --popover: 0 0% 7%;
+    --popover-foreground: 0 0% 96%;
+
+    --primary: 0 0% 96%;
+    --primary-foreground: 0 0% 4%;
+
+    --secondary: 0 0% 12%;
+    --secondary-foreground: 0 0% 96%;
+
+    --muted: 0 0% 14%;
+    --muted-foreground: 0 0% 64%;
+
+    --accent: 0 0% 96%;
+    --accent-foreground: 0 0% 4%;
+
+    --destructive: 0 70% 50%;
+    --destructive-foreground: 0 0% 96%;
+
+    --border: 0 0% 22%;
+    --input: 0 0% 22%;
+    --ring: 0 0% 96%;
+
+    --radius: 0rem;                    /* hard edges */
+
+    --paper: 0 0% 4%;
+    --ink: 0 0% 96%;
+    --ink-soft: 0 0% 72%;
+    --ink-mute: 0 0% 52%;
+    --rule: 0 0% 28%;
+    --tan: 0 0% 18%;
+    --espresso: 0 0% 96%;
+
+    --font-display: 'JetBrains Mono', 'Courier New', monospace;
+    --font-body: 'Inter Tight', 'Manrope', system-ui, sans-serif;
+    --font-fine: 'Manrope', 'Inter Tight', system-ui, sans-serif;
+
+    --shadow-tile: 0 1px 2px hsl(0 0% 0% / 0.6);
+
+    --sidebar-background: 0 0% 6%;
+    --sidebar-foreground: 0 0% 96%;
+    --sidebar-primary: 0 0% 96%;
+    --sidebar-primary-foreground: 0 0% 4%;
+    --sidebar-accent: 0 0% 12%;
+    --sidebar-accent-foreground: 0 0% 96%;
+    --sidebar-border: 0 0% 22%;
+    --sidebar-ring: 0 0% 96%;
+  }
+
+  .dark {
+    --background: 25 12% 10%;
+    --foreground: 36 22% 88%;
+    --card: 25 12% 12%;
+    --card-foreground: 36 22% 88%;
+    --popover: 25 12% 12%;
+    --popover-foreground: 36 22% 88%;
+    --primary: 36 22% 88%;
+    --primary-foreground: 25 12% 10%;
+    --secondary: 25 8% 18%;
+    --secondary-foreground: 36 22% 88%;
+    --muted: 25 8% 18%;
+    --muted-foreground: 36 12% 60%;
+    --accent: 22 35% 50%;
+    --accent-foreground: 25 12% 10%;
+    --destructive: 5 55% 45%;
+    --destructive-foreground: 36 22% 88%;
+    --border: 25 8% 22%;
+    --input: 25 8% 22%;
+    --ring: 36 22% 88%;
+  }
+}
+
+@layer base {
+  * { @apply border-border; }
+  html, body, #root { height: 100%; }
+  body {
+    @apply bg-background text-foreground antialiased;
+    font-family: var(--font-body);
+    font-feature-settings: "ss01", "cv11";
+  }
+  h1, h2, h3, h4 {
+    font-family: var(--font-display);
+    font-weight: 400;
+    letter-spacing: -0.01em;
+  }
+  /* Ledger-specific typography polish */
+  [data-theme="ledger"] h1,
+  [data-theme="ledger"] h2,
+  [data-theme="ledger"] h3,
+  [data-theme="ledger"] h4,
+  [data-theme="accord"] h1,
+  [data-theme="accord"] h2,
+  [data-theme="accord"] h3,
+  [data-theme="accord"] h4 {
+    font-family: var(--font-display);
+    font-weight: 500;
+    letter-spacing: -0.04em;
+    line-height: 1;
+    text-transform: none;
+  }
+  [data-theme="ledger"] body,
+  [data-theme="accord"] body {
+    letter-spacing: -0.005em;
+  }
+  /* Only the very smallest fine print falls back to clean sans for legibility */
+  [data-theme="ledger"] .text-\[10px\],
+  [data-theme="accord"] .text-\[10px\] {
+    font-family: var(--font-fine);
+    letter-spacing: 0;
+  }
+}
+
+@layer components {
+  .label-caps {
+    font-family: var(--font-body);
+    font-size: 0.6875rem;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: hsl(var(--ink-soft));
+    font-weight: 500;
+  }
+  .display {
+    font-family: var(--font-display);
+    font-weight: 300;
+    letter-spacing: -0.02em;
+    line-height: 0.95;
+  }
+  .rule {
+    height: 1px;
+    background: hsl(var(--rule) / 0.35);
+  }
+  .rule-thick {
+    height: 1px;
+    background: hsl(var(--rule));
+  }
+  .paper {
+    background: hsl(var(--paper));
+  }
+  .grain {
+    background-image:
+      radial-gradient(hsl(var(--rule) / 0.05) 1px, transparent 1px);
+    background-size: 3px 3px;
+  }
+  /* accord theme: force black text inside light-colored discover cards */
+  .accord-card-dark,
+  .accord-card-dark * {
+    color: hsl(0 0% 0%) !important;
+  }
+}
