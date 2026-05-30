@@ -47,7 +47,7 @@ type Suggestion = {
 };
 
 type SuggestPayload = { intro: string; suggestions: Suggestion[] };
-type WildcardPayload = { scenario: string; pick: Suggestion };
+type WildcardPayload = { scenario: string; pick: Suggestion & { smells_like?: string[] } };
 
 const VIBE_PROMPTS = [
   "the smell of a library after rain",
@@ -784,12 +784,20 @@ export default function Discover() {
                 <div className="font-display text-[26px] text-ink lowercase leading-none">
                   {wild.pick.name.toLowerCase()}
                 </div>
-                <div className="text-[12px] text-ink/60 lowercase mt-1">
-                  {wild.pick.house.toLowerCase()}
+                <div className="text-[11px] text-ink/50 lowercase mt-1 tracking-wide">
+                  by {wild.pick.house.toLowerCase()}
                 </div>
-                <p className="text-[13px] text-ink/85 mt-3 leading-snug">
-                  {wild.pick.why}
-                </p>
+                {(wild.pick as any).smells_like?.length > 0 && (
+                  <div className="mt-4 space-y-1.5">
+                    <div className="text-[10px] tracking-[0.22em] uppercase text-ink/50 mb-2">smells like</div>
+                    {(wild.pick as any).smells_like.slice(0, 5).map((b: string, i: number) => (
+                      <div key={i} className="flex items-start gap-2 text-[13px] text-ink/85 lowercase">
+                        <span className="text-ink/30 mt-0.5">—</span>
+                        <span>{b.toLowerCase()}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
                 {wild.pick.notes && wild.pick.notes.length > 0 && (
                   <div className="flex flex-wrap gap-1.5 mt-3">
                     {wild.pick.notes.slice(0, 5).map((n) => (
@@ -801,6 +809,11 @@ export default function Discover() {
                       </span>
                     ))}
                   </div>
+                )}
+                {wild.pick.why && (
+                  <p className="text-[12px] text-ink/50 mt-3 italic lowercase">
+                    {wild.pick.why.toLowerCase()}
+                  </p>
                 )}
                 <div className="flex justify-end mt-4">
                   <SaveButton

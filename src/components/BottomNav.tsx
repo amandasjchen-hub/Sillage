@@ -13,7 +13,7 @@ const items = [
 export default function BottomNav() {
   const { pathname } = useLocation();
   return (
-    <nav className="fixed bottom-0 inset-x-0 z-40 bg-paper/95 backdrop-blur border-t border-rule/50">
+    <nav className="fixed bottom-0 inset-x-0 z-40 bg-paper/95 backdrop-blur border-t border-rule/50" style={{ paddingBottom: 'max(env(safe-area-inset-bottom), 16px)' }}>
       <div className="mx-auto max-w-md grid grid-cols-5">
         {items.map(({ to, label, icon: Icon }) => {
           const active = pathname === to || (to !== "/" && pathname.startsWith(to));
@@ -22,12 +22,12 @@ export default function BottomNav() {
               key={to}
               to={to}
               className={cn(
-                "flex flex-col items-center gap-1 py-3 transition-colors",
+                "flex flex-col items-center gap-1.5 py-4 transition-colors",
                 active ? "text-ink" : "text-ink-mute hover:text-ink"
               )}
             >
-              <Icon className="w-[18px] h-[18px]" strokeWidth={1.5} />
-              <span className="text-[10px] lowercase tracking-wide">{label}</span>
+              <Icon className="w-[22px] h-[22px]" strokeWidth={1.5} />
+              <span className="text-[11px] lowercase tracking-wide">{label}</span>
             </Link>
           );
         })}

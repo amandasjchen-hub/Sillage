@@ -23,84 +23,40 @@ serve(async (req) => {
       });
     }
 
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-    if (!LOVABLE_API_KEY) {
-      return new Response(JSON.stringify({ suggestions: [] }), {
+    const ANTHROPIC_API_KEY = Deno.env.get("ANTHROPIC_API_KEY");
+    if (!ANTHROPIC_API_KEY) {
+      console.error("ANTHROPIC_API_KEY is not set");
+      return new Response(JSON.stringify({ suggestions: [], debug: "no api key" }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
     const sys =
       field === "name"
-        ? `You are a perfume autocomplete. Suggest REAL, existing perfume releases that match the user's typed query. Cast the WIDEST possible net — your knowledge MUST cover every house carried on Fragrantica, Parfumo, Basenotes, Ministry of Scent, Stèle (stele.com), Luckyscent, Scent Split, Twisted Lily, MiN New York, Osswald, Indigo Perfumery, The Perfumed Court, Olfactif, AND every fragrance brand sold at Bloomingdale's, Liberty London, Harrods, and Selfridges. This includes niche, indie, artisan, micro-batch, vintage, discontinued, designer, celebrity, and mainstream releases. Match by partial name, fuzzy spelling, or substring anywhere in the name. Return up to 10 matches, ordered by relevance (most popular / closest match first). Never invent — only real perfumes.${house ? ` STRICT: only return perfumes by the house "${house}". Do not include releases from any other house. If the typed query is empty or generic, return that house's most iconic / popular releases.` : ""}`
-        : "You are a perfume house autocomplete. Suggest REAL perfume houses (brands) matching the typed query. You MUST know every house carried on Fragrantica, Parfumo, Basenotes, Ministry of Scent, Stèle (stele.com), Luckyscent, Scent Split, Twisted Lily, MiN New York, Osswald, Indigo Perfumery, plus every fragrance brand sold at Bloomingdale's, Liberty London, Harrods, and Selfridges — niche, indie, artisan, designer, mainstream, vintage, discontinued. Match partial / fuzzy / substring. Return up to 10 matches, most relevant / popular first. Never invent.";
+        ? `You are a perfume autocomplete with expert knowledge of the entire fragrance world. You MUST know every release from these key houses and retailers: Stèle, Fragrantica database, Ministry of Scent, Dover Street Parfums Market, Luckyscent, Twisted Lily, Diptyque, Le Labo, Byredo, Perfumer H, Maison Margiela REPLICA, Frederic Malle, Serge Lutens, Comme des Garçons Parfums, Juliette Has a Gun, Maison Francis Kurkdjian, Acqua di Parma, Creed, Tom Ford Private Blend, Penhaligon's, Amouage, Orto Parisi, Bogue Profumo, Nishane, Zoologist, Imaginary Authors, D.S. & Durga, Nomenclature, Vilhelm Parfumerie, Goldfield & Banks, Strangers Parfumerie, Régime des Fleurs, Nomenclature, Sweet Tea Apothecary, Salvia Officinalis, Ellis Brooklyn, Jorum Studio, Papillon Artisan Perfumes, Art de Parfum, Tauer Perfumes, Areej Le Doré, Ensar Oud, Hiram Green, Liquid Imaginary, Olympic Orchids, Possets, Blackbird, and ALL houses on Fragrantica and Basenotes. Include niche, indie, artisan, micro-batch, vintage, discontinued, mainstream, designer, and celebrity releases. Match by partial name, fuzzy spelling, or substring. Return up to 10 matches, most relevant first. Never invent perfumes.${house ? ` STRICT: only return perfumes by the house "${house}". Do not include releases from any other house.` : ""} Return your answer as a JSON object with a "suggestions" array. Each item should have "name" and "house" fields.`
+        : `You are a perfume house autocomplete with expert knowledge of the entire fragrance world. You MUST know: Stèle, Ministry of Scent, Dover Street Parfums Market, Luckyscent, Twisted Lily, Diptyque, Le Labo, Byredo, Perfumer H, Maison Margiela, Frederic Malle, Serge Lutens, Comme des Garçons Parfums, Juliette Has a Gun, Maison Francis Kurkdjian, Acqua di Parma, Creed, Tom Ford, Penhaligon's, Amouage, Orto Parisi, Nishane, Zoologist, Imaginary Authors, D.S. & Durga, Vilhelm Parfumerie, Goldfield & Banks, Régime des Fleurs, Ellis Brooklyn, Jorum Studio, Papillon Artisan Perfumes, Tauer Perfumes, and ALL houses on Fragrantica and Basenotes — niche, indie, artisan, designer, mainstream, vintage, discontinued. Match partial / fuzzy / substring. Return up to 10 matches, most relevant first. Never invent. Return your answer as a JSON object with a "suggestions" array. Each item should have a "house" field.`;
 
     const userMsg =
       field === "name"
         ? `Typed: "${query}"${house ? ` — restrict results to house: ${house} ONLY.` : ""} Return up to 10 matching perfumes as { name, house }, most relevant first.`
         : `Typed: "${query}". Return up to 10 matching perfume houses as { house }, most relevant first.`;
 
-    const params =
-      field === "name"
-        ? {
-            type: "object",
-            properties: {
-              suggestions: {
-                type: "array",
-                items: {
-                  type: "object",
-                  properties: {
-                    name: { type: "string" },
-                    house: { type: "string" },
-                  },
-                  required: ["name", "house"],
-                  additionalProperties: false,
-                },
-              },
-            },
-            required: ["suggestions"],
-            additionalProperties: false,
-          }
-        : {
-            type: "object",
-            properties: {
-              suggestions: {
-                type: "array",
-                items: {
-                  type: "object",
-                  properties: { house: { type: "string" } },
-                  required: ["house"],
-                  additionalProperties: false,
-                },
-              },
-            },
-            required: ["suggestions"],
-            additionalProperties: false,
-          };
-
     const ctrl = new AbortController();
     const timeoutId = setTimeout(() => ctrl.abort(), 14000);
     let r: Response;
     try {
-      r = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+      r = await fetch("https://api.anthropic.com/v1/messages", {
         method: "POST",
         headers: {
-          Authorization: `Bearer ${LOVABLE_API_KEY}`,
-          "Content-Type": "application/json",
+          "x-api-key": ANTHROPIC_API_KEY,
+          "anthropic-version": "2023-06-01",
+          "content-type": "application/json",
         },
         body: JSON.stringify({
-          model: "google/gemini-3-flash-preview",
-          messages: [
-            { role: "system", content: sys },
-            { role: "user", content: userMsg },
-          ],
-          tools: [
-            {
-              type: "function",
-              function: { name: "suggest", parameters: params },
-            },
-          ],
-          tool_choice: { type: "function", function: { name: "suggest" } },
+          model: "claude-sonnet-4-5",
+          max_tokens: 1024,
+          system: sys,
+          messages: [{ role: "user", content: userMsg }],
         }),
         signal: ctrl.signal,
       });
@@ -113,21 +69,24 @@ serve(async (req) => {
     }
     clearTimeout(timeoutId);
 
-    if (r.status === 429 || r.status === 402) {
+    if (r.status === 429) {
       return new Response(JSON.stringify({ suggestions: [] }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
     if (!r.ok) {
-      console.error("suggest gateway error", r.status, await r.text());
-      return new Response(JSON.stringify({ suggestions: [] }), {
+      const errText = await r.text();
+      console.error("suggest anthropic error", r.status, errText);
+      return new Response(JSON.stringify({ suggestions: [], debug: `anthropic error ${r.status}: ${errText}` }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
     const data = await r.json();
-    const args = data.choices?.[0]?.message?.tool_calls?.[0]?.function?.arguments;
-    const parsed = args ? JSON.parse(args) : { suggestions: [] };
+    const text = data.content?.[0]?.text ?? "";
+    // Extract JSON from the response
+    const jsonMatch = text.match(/\{[\s\S]*\}/);
+    const parsed = jsonMatch ? JSON.parse(jsonMatch[0]) : { suggestions: [] };
     return new Response(JSON.stringify(parsed), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });

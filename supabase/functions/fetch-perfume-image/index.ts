@@ -149,36 +149,28 @@ function toBase64(bytes: Uint8Array): string {
 
 // Ask the model for the brand's official domain(s) so we can whitelist them.
 async function resolveBrandDomains(house: string): Promise<string[]> {
-  const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-  if (!LOVABLE_API_KEY || !house) return [];
+  const ANTHROPIC_API_KEY = Deno.env.get("ANTHROPIC_API_KEY");
+  if (!ANTHROPIC_API_KEY || !house) return [];
   try {
-    const r = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+    const r = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
-      headers: { Authorization: `Bearer ${LOVABLE_API_KEY}`, "Content-Type": "application/json" },
+      headers: {
+        "x-api-key": ANTHROPIC_API_KEY,
+        "anthropic-version": "2023-06-01",
+        "content-type": "application/json",
+      },
       body: JSON.stringify({
-        model: "google/gemini-2.5-flash",
-        messages: [
-          { role: "system", content: "Return only the official brand-owned web domain(s) for a perfume house. Examples: 'Diptyque' -> diptyqueparis.com; 'Frédéric Malle' -> fredericmalle.com,fredericmalle.eu. No retailers." },
-          { role: "user", content: `House: ${house}` },
-        ],
-        tools: [{
-          type: "function",
-          function: {
-            name: "domains",
-            parameters: {
-              type: "object",
-              properties: { domains: { type: "array", items: { type: "string" } } },
-              required: ["domains"], additionalProperties: false,
-            },
-          },
-        }],
-        tool_choice: { type: "function", function: { name: "domains" } },
+        model: "claude-haiku-4-5",
+        max_tokens: 256,
+        system: "Return only the official brand-owned web domain(s) for a perfume house. Examples: 'Diptyque' -> diptyqueparis.com; 'Frédéric Malle' -> fredericmalle.com,fredericmalle.eu. No retailers. Return your answer as a JSON object with a \"domains\" array of strings.",
+        messages: [{ role: "user", content: `House: ${house}` }],
       }),
     });
     if (!r.ok) return [];
     const d = await r.json();
-    const args = d.choices?.[0]?.message?.tool_calls?.[0]?.function?.arguments;
-    const arr = args ? (JSON.parse(args).domains as string[]) : [];
+    const text = d.content?.[0]?.text ?? "";
+    const jsonMatch = text.match(/\{[\s\S]*\}/);
+    const arr = jsonMatch ? (JSON.parse(jsonMatch[0]).domains as string[]) : [];
     return arr.map((s) => s.toLowerCase().replace(/^https?:\/\//, "").replace(/^www\./, "").split("/")[0]).filter(Boolean);
   } catch {
     return [];
@@ -193,20 +185,22 @@ async function verifyBottle(
   name: string,
   house: string | undefined,
 ): Promise<{ ok: boolean; reason: string }> {
-  const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-  if (!LOVABLE_API_KEY) return { ok: true, reason: "no key, skipped" };
+  const ANTHROPIC_API_KEY = Deno.env.get("ANTHROPIC_API_KEY");
+  if (!ANTHROPIC_API_KEY) return { ok: true, reason: "no key, skipped" };
   try {
-    const r = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+    const r = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
-      headers: { Authorization: `Bearer ${LOVABLE_API_KEY}`, "Content-Type": "application/json" },
+      headers: {
+        "x-api-key": ANTHROPIC_API_KEY,
+        "anthropic-version": "2023-06-01",
+        "content-type": "application/json",
+      },
       body: JSON.stringify({
-        model: "google/gemini-2.5-flash",
+        model: "claude-sonnet-4-5",
+        max_tokens: 512,
+        system:
+          "You are a product-image verifier for a luxury perfume catalog. Approve ONLY images that look like professional e-commerce or brand photography — the kind you would see on Net-a-Porter, Luckyscent, or a brand's own website. APPROVE: clean product shots with plain, white, or neutral backgrounds; beautifully styled brand photography with tasteful props or botanicals that look professionally lit and composed. REJECT without exception: any amateur photo (cluttered backgrounds, bad lighting, blurry, grainy, low resolution, or phone camera quality); any photo containing a person, hand, finger, body part, model, or face; any photo with multiple different bottles; bottles from a DIFFERENT perfume in the same house; logos, wordmarks, banners, swatches, ads, category collages, thumbnails, or screenshots; any image where no perfume bottle is clearly visible; photos taken on bathroom counters, shelves, dressers, desks, or other personal home settings. The bottle must be the clear subject of a professional photograph. When in doubt about quality, reject. Return your answer as a JSON object with fields: is_correct_bottle (boolean), is_single_bottle (boolean), contains_person_or_hand (boolean), is_professional_quality (boolean), visible_label_text (string), reason (string).",
         messages: [
-          {
-            role: "system",
-            content:
-              "You are a product-image verifier for a perfume catalog. Approve if the image clearly shows EXACTLY ONE bottle of the requested perfume (and optionally its box). The bottle is the subject of the photo, but the background may be plain OR styled with botanicals, fabric, props, or other styling — many niche brands use styled product photography. REJECT, with no exceptions: any photo containing a person, hand, finger, body part, model, or face; any photo with multiple different bottles; bottles from a DIFFERENT perfume in the same house; logos, wordmarks, banners, swatches, ads, category collages, or thumbnails; any image where no perfume bottle is actually visible. The bottle's visible label, shape, and cap must match the requested perfume. When in doubt about identity, reject; when in doubt about styling, approve.",
-          },
           {
             role: "user",
             content: [
@@ -215,43 +209,28 @@ async function verifyBottle(
                 text: `Verify this image is the official single-bottle product photo for: "${name}"${house ? ` by ${house}` : ""}. Read any visible text on the label.`,
               },
               {
-                type: "image_url",
-                image_url: { url: `data:${contentType};base64,${imageBase64}` },
+                type: "image",
+                source: {
+                  type: "base64",
+                  media_type: contentType as "image/jpeg" | "image/png" | "image/gif" | "image/webp",
+                  data: imageBase64,
+                },
               },
             ],
           },
         ],
-        tools: [{
-          type: "function",
-          function: {
-            name: "verdict",
-            parameters: {
-              type: "object",
-              properties: {
-                is_correct_bottle: { type: "boolean", description: "True only if this is clearly the bottle of the requested perfume." },
-                is_single_bottle: { type: "boolean", description: "True only if exactly one perfume bottle is visible." },
-                contains_person_or_hand: { type: "boolean", description: "True if any person, hand, finger, body part, or face is visible." },
-                is_lifestyle_or_scene: { type: "boolean", description: "True if this is a lifestyle/editorial scene rather than a clean product shot on a plain background." },
-                visible_label_text: { type: "string", description: "Any text legible on the bottle/box label, lowercased." },
-                reason: { type: "string", description: "Short explanation." },
-              },
-              required: ["is_correct_bottle", "is_single_bottle", "contains_person_or_hand", "is_lifestyle_or_scene", "reason"],
-              additionalProperties: false,
-            },
-          },
-        }],
-        tool_choice: { type: "function", function: { name: "verdict" } },
       }),
     });
     if (!r.ok) {
-      // If verifier is down (e.g. 429/402), do not block — fall back to allow.
+      // If verifier is down (e.g. 429), do not block — fall back to allow.
       console.warn("verifier non-ok", r.status);
       return { ok: true, reason: `verifier ${r.status}, skipped` };
     }
     const d = await r.json();
-    const args = d.choices?.[0]?.message?.tool_calls?.[0]?.function?.arguments;
-    if (!args) return { ok: false, reason: "no verdict" };
-    const parsed = JSON.parse(args);
+    const text = d.content?.[0]?.text ?? "";
+    const jsonMatch = text.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) return { ok: false, reason: "no verdict" };
+    const parsed = JSON.parse(jsonMatch[0]);
     // Hard requirements: must be the right bottle, exactly one bottle, no people.
     // We previously also rejected "lifestyle" shots, but many brands (esp. niche
     // perfumers like Perfumer H, Mad et Len) style their official product photos
@@ -260,7 +239,8 @@ async function verifyBottle(
     const ok =
       !!parsed.is_correct_bottle &&
       !!parsed.is_single_bottle &&
-      !parsed.contains_person_or_hand;
+      !parsed.contains_person_or_hand &&
+      !!parsed.is_professional_quality;
     const reason = ok
       ? parsed.reason ?? ""
       : `${parsed.reason ?? ""} [single=${parsed.is_single_bottle} person=${parsed.contains_person_or_hand} lifestyle=${parsed.is_lifestyle_or_scene} correct=${parsed.is_correct_bottle}]`;

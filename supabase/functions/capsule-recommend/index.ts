@@ -7,41 +7,12 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
-const SCHEMA = {
-  type: "object",
-  properties: {
-    intro: {
-      type: "string",
-      description: "one short lowercase sentence framing the capsule for this trip.",
-    },
-    picks: {
-      type: "array",
-      minItems: 3,
-      maxItems: 6,
-      items: {
-        type: "object",
-        properties: {
-          perfume_id: { type: "string", description: "the id from the provided owned list" },
-          reason: {
-            type: "string",
-            description: "one short lowercase line — when/why on this trip",
-          },
-        },
-        required: ["perfume_id", "reason"],
-        additionalProperties: false,
-      },
-    },
-  },
-  required: ["intro", "picks"],
-  additionalProperties: false,
-} as const;
-
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-    if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY missing");
+    const ANTHROPIC_API_KEY = Deno.env.get("ANTHROPIC_API_KEY");
+    if (!ANTHROPIC_API_KEY) throw new Error("ANTHROPIC_API_KEY missing");
 
     const { trip_notes, count } = (await req.json()) as {
       trip_notes: string;
@@ -94,23 +65,21 @@ serve(async (req) => {
       .join("\n");
 
     const sys =
-      "You are a perfume packing oracle. The user describes a trip. Pick a small, intentional capsule of bottles from THEIR OWNED COLLECTION ONLY (no inventions). Aim for variety across day/night and warm/fresh registers as the trip suggests. Tone: lowercase, warm, sharp. Each `reason` must be one tight line — when on the trip to wear it. Always return real ids from the provided list, never make ids up.";
+      "You are a perfume packing oracle. The user describes a trip. Pick a small, intentional capsule of bottles from THEIR OWNED COLLECTION ONLY (no inventions). Aim for variety across day/night and warm/fresh registers as the trip suggests. Tone: lowercase, warm, sharp. Each `reason` must be one tight line — when on the trip to wear it. Always return real ids from the provided list, never make ids up. Return your answer as a JSON object with an \"intro\" string and a \"picks\" array. Each pick has \"perfume_id\" (the id from the provided owned list) and \"reason\" (one short lowercase line).";
     const userMsg = `the trip:\n"${trip_notes.trim()}"\n\ntarget: ${target} bottles.\n\nthe user's owned shelf:\n${lines}\n\npack the capsule.`;
 
-    const r = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+    const r = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${LOVABLE_API_KEY}`,
-        "Content-Type": "application/json",
+        "x-api-key": ANTHROPIC_API_KEY,
+        "anthropic-version": "2023-06-01",
+        "content-type": "application/json",
       },
       body: JSON.stringify({
-        model: "google/gemini-2.5-pro",
-        messages: [
-          { role: "system", content: sys },
-          { role: "user", content: userMsg },
-        ],
-        tools: [{ type: "function", function: { name: "pack", parameters: SCHEMA } }],
-        tool_choice: { type: "function", function: { name: "pack" } },
+        model: "claude-haiku-4-5",
+        max_tokens: 1024,
+        system: sys,
+        messages: [{ role: "user", content: userMsg }],
       }),
     });
 
@@ -120,20 +89,15 @@ serve(async (req) => {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
-    if (r.status === 402) {
-      return new Response(JSON.stringify({ error: "ai credits exhausted" }), {
-        status: 402,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
     if (!r.ok) {
       console.error("ai error", r.status, await r.text());
       throw new Error("ai_error");
     }
     const data = await r.json();
-    const args = data.choices?.[0]?.message?.tool_calls?.[0]?.function?.arguments;
-    if (!args) throw new Error("no_tool_call");
-    const out = JSON.parse(args);
+    const text = data.content?.[0]?.text ?? "";
+    const jsonMatch = text.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) throw new Error("no_json_response");
+    const out = JSON.parse(jsonMatch[0]);
 
     // Filter to valid ids only
     const validIds = new Set(owned.map((p: any) => p.id));
