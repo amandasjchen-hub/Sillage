@@ -103,6 +103,7 @@ export default function Account() {
   const [fullName, setFullName] = useState("");
   const [location, setLocation] = useState("");
   const [niche, setNiche] = useState<number>(3);
+  const [backfill, setBackfill] = useState<{ done: number; total: number } | null>(null);
 
   useEffect(() => {
     if (!user) return;
@@ -138,6 +139,46 @@ export default function Account() {
     } else {
       toast({ title: "saved", description: "your taste profile is updated" });
     }
+  }
+
+  async function fillMissingPhotos() {
+    if (!user || backfill) return;
+    const { data: missing, error } = await supabase
+      .from("perfumes")
+      .select("id, name, house")
+      .eq("user_id", user.id)
+      .is("image_url", null);
+    if (error) {
+      toast({ title: "couldn't load ledger", description: error.message, variant: "destructive" });
+      return;
+    }
+    if (!missing?.length) {
+      toast({ title: "nothing missing", description: "every perfume already has a photo" });
+      return;
+    }
+    setBackfill({ done: 0, total: missing.length });
+    let found = 0;
+    for (let i = 0; i < missing.length; i++) {
+      const p = missing[i];
+      try {
+        const { data } = await supabase.functions.invoke("fetch-perfume-image", {
+          body: { name: p.name, house: p.house },
+        });
+        const image_url = (data as any)?.image_url;
+        if (image_url) {
+          await supabase
+            .from("perfumes")
+            .update({ image_url, image_source: (data as any)?.image_source ?? null })
+            .eq("id", p.id);
+          found++;
+        }
+      } catch {
+        // skip this one, keep going
+      }
+      setBackfill({ done: i + 1, total: missing.length });
+    }
+    setBackfill(null);
+    toast({ title: "photos updated", description: `found ${found} of ${missing.length}` });
   }
 
   async function detectLocation() {
@@ -326,6 +367,15 @@ export default function Account() {
             })}
           </div>
         </section>
+
+        <Button
+          onClick={fillMissingPhotos}
+          disabled={!!backfill}
+          variant="outline"
+          className="w-full h-12 rounded-full border-rule/60 bg-card text-ink hover:bg-muted/60 text-[13px] lowercase"
+        >
+          {backfill ? `pulling photos… ${backfill.done}/${backfill.total}` : "fill in missing photos"}
+        </Button>
 
         <Button
           onClick={signOut}
