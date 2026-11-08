@@ -17,6 +17,8 @@ import Diary from "./pages/Diary.tsx";
 import Shelves from "./pages/Shelves.tsx";
 import Discover from "./pages/Discover.tsx";
 import Account from "./pages/Account.tsx";
+import People from "./pages/People.tsx";
+import Profile from "./pages/Profile.tsx";
 import NotFound from "./pages/NotFound.tsx";
 
 const queryClient = new QueryClient();
@@ -48,6 +50,8 @@ const App = () => (
               <Route path="/shelves" element={<ProtectedRoute><Shelves /></ProtectedRoute>} />
               <Route path="/discover" element={<ProtectedRoute><Discover /></ProtectedRoute>} />
               <Route path="/account" element={<ProtectedRoute><Account /></ProtectedRoute>} />
+              <Route path="/people" element={<ProtectedRoute><People /></ProtectedRoute>} />
+              <Route path="/u/:username" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
               <Route path="/add" element={<ProtectedRoute><AddPerfume /></ProtectedRoute>} />
               <Route path="/scan" element={<ProtectedRoute><ScanPerfume /></ProtectedRoute>} />
               <Route path="/perfume/:id" element={<ProtectedRoute><PerfumeDetail /></ProtectedRoute>} />

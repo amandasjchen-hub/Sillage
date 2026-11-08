@@ -64,6 +64,7 @@ export type Shelf = {
   user_id: string;
   name: string;
   description: string | null;
+  is_shared?: boolean;
   created_at: string;
   updated_at: string;
 };

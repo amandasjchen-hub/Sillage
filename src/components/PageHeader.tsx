@@ -1,5 +1,5 @@
 import { Link } from "react-router-dom";
-import { Settings } from "lucide-react";
+import { Settings, Users } from "lucide-react";
 
 type Props = {
   eyebrow?: string;
@@ -12,6 +12,15 @@ type Props = {
 export default function PageHeader({ eyebrow, title, meta, right, hideSettings }: Props) {
   return (
     <header className="px-5 pt-10 pb-5 relative">
+      {!hideSettings && (
+        <Link
+          to="/people"
+          aria-label="people"
+          className="absolute top-5 right-14 w-9 h-9 rounded-full flex items-center justify-center text-ink-soft hover:text-ink hover:bg-muted/60 transition-colors"
+        >
+          <Users className="w-[18px] h-[18px]" strokeWidth={1.5} />
+        </Link>
+      )}
       {!hideSettings && (
         <Link
           to="/account"

@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import { Loader2, MapPin } from "lucide-react";
 import AppShell from "@/components/AppShell";
 import PageHeader from "@/components/PageHeader";
@@ -7,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
+import { Switch } from "@/components/ui/switch";
 import { supabase } from "@/lib/supabase";
 import { toast } from "@/hooks/use-toast";
 import { useTheme, THEMES, type ThemeName } from "@/lib/theme";
@@ -103,6 +105,11 @@ export default function Account() {
   const [fullName, setFullName] = useState("");
   const [location, setLocation] = useState("");
   const [niche, setNiche] = useState<number>(3);
+  const [username, setUsername] = useState("");
+  const [savedUsername, setSavedUsername] = useState("");
+  const [isPrivate, setIsPrivate] = useState(false);
+  const [shareWearing, setShareWearing] = useState(false);
+  const [savingUsername, setSavingUsername] = useState(false);
   const [backfill, setBackfill] = useState<{ done: number; total: number } | null>(null);
 
   useEffect(() => {
@@ -110,13 +117,17 @@ export default function Account() {
     (async () => {
       const { data } = await supabase
         .from("profiles")
-        .select("full_name, location, niche_level, display_name")
+        .select("full_name, location, niche_level, display_name, username, is_private_account, share_wearing")
         .eq("id", user.id)
         .maybeSingle();
       if (data) {
         setFullName(data.full_name ?? data.display_name ?? "");
         setLocation(data.location ?? "");
         setNiche(data.niche_level ?? 3);
+        setUsername(data.username ?? "");
+        setSavedUsername(data.username ?? "");
+        setIsPrivate(!!data.is_private_account);
+        setShareWearing(!!data.share_wearing);
       }
       setLoading(false);
     })();
@@ -138,6 +149,45 @@ export default function Account() {
       toast({ title: "couldn't save", description: error.message, variant: "destructive" });
     } else {
       toast({ title: "saved", description: "your taste profile is updated" });
+    }
+  }
+
+  async function saveUsername() {
+    if (!user) return;
+    const next = username.trim().toLowerCase();
+    if (!/^[a-z0-9_]{3,24}$/.test(next)) {
+      toast({
+        title: "username not valid",
+        description: "3–24 characters: letters, numbers and underscores.",
+        variant: "destructive",
+      });
+      return;
+    }
+    setSavingUsername(true);
+    const { error } = await supabase.from("profiles").update({ username: next }).eq("id", user.id);
+    setSavingUsername(false);
+    if (error) {
+      toast({
+        title: error.code === "23505" ? "that username is taken" : "couldn't save",
+        description: error.code === "23505" ? "try another." : error.message,
+        variant: "destructive",
+      });
+      return;
+    }
+    setUsername(next);
+    setSavedUsername(next);
+    toast({ title: "saved", description: `you're @${next}` });
+  }
+
+  async function updateFlag(field: "is_private_account" | "share_wearing", value: boolean) {
+    if (!user) return;
+    if (field === "is_private_account") setIsPrivate(value);
+    else setShareWearing(value);
+    const { error } = await supabase.from("profiles").update({ [field]: value }).eq("id", user.id);
+    if (error) {
+      if (field === "is_private_account") setIsPrivate(!value);
+      else setShareWearing(!value);
+      toast({ title: "couldn't save", description: error.message, variant: "destructive" });
     }
   }
 
@@ -319,6 +369,77 @@ export default function Account() {
               </Button>
             </>
           )}
+        </section>
+
+        {/* SOCIAL */}
+        <section className="bg-card border border-rule/40 rounded-2xl p-4 space-y-5">
+          <div>
+            <div className="text-[10px] tracking-[0.22em] uppercase text-ink-soft mb-1">the circle</div>
+            <h2 className="font-display font-light text-[22px] text-ink lowercase leading-tight">sharing</h2>
+            <p className="text-[12px] text-ink-soft lowercase mt-1">
+              nothing is visible to anyone until you choose. pick a username, then share shelves one by one.
+            </p>
+          </div>
+
+          <div className="space-y-1.5">
+            <Label htmlFor="username" className="text-[11px] lowercase text-ink-soft">
+              username
+            </Label>
+            <div className="flex gap-2">
+              <Input
+                id="username"
+                value={username}
+                onChange={(e) => setUsername(e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, ""))}
+                placeholder="yourname"
+                maxLength={24}
+                className="h-10 text-[14px] flex-1"
+              />
+              <Button
+                type="button"
+                variant="outline"
+                onClick={saveUsername}
+                disabled={savingUsername || !username || username === savedUsername}
+                className="h-10 rounded-md border-rule/60 text-[12px] lowercase"
+              >
+                {savingUsername ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : "save"}
+              </Button>
+            </div>
+          </div>
+
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <div className="text-[13px] text-ink lowercase">private account</div>
+              <div className="text-[11px] text-ink-soft lowercase">people must request to follow you.</div>
+            </div>
+            <Switch checked={isPrivate} onCheckedChange={(v) => updateFlag("is_private_account", v)} />
+          </div>
+
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <div className="text-[13px] text-ink lowercase">show what i'm wearing</div>
+              <div className="text-[11px] text-ink-soft lowercase">
+                followers see your latest diary perfume, not your notes.
+              </div>
+            </div>
+            <Switch checked={shareWearing} onCheckedChange={(v) => updateFlag("share_wearing", v)} />
+          </div>
+
+          <div className="flex gap-2">
+            <Link
+              to="/people"
+              className="flex-1 h-10 rounded-full border border-rule/60 text-[12px] lowercase text-ink flex items-center justify-center hover:bg-muted/60"
+            >
+              find people
+            </Link>
+            {savedUsername && (
+              <Link
+                to={`/u/${savedUsername}`}
+                className="flex-1 h-10 rounded-full border border-rule/60 text-[12px] lowercase text-ink flex items-center justify-center hover:bg-muted/60"
+              >
+                my profile
+              </Link>
+            )}
+          </div>
         </section>
 
         {/* THEME PICKER */}

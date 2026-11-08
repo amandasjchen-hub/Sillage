@@ -95,6 +95,14 @@ export default function Shelves() {
     toast.success("shelf made.");
   };
 
+  const toggleShared = async (sh: ShelfWithCount) => {
+    const next = !sh.is_shared;
+    const { error } = await supabase.from("shelves").update({ is_shared: next }).eq("id", sh.id);
+    if (error) return toast.error(error.message);
+    setShelves((list) => list.map((x) => (x.id === sh.id ? { ...x, is_shared: next } : x)));
+    toast.success(next ? "shared with your followers." : "private again.");
+  };
+
   const remove = async (id: string) => {
     if (!confirm("remove this shelf? perfumes stay in your collection.")) return;
     await supabase.from("shelves").delete().eq("id", id);
@@ -245,19 +253,31 @@ export default function Shelves() {
                 key={s.id}
                 className="bg-card border border-rule/40 rounded-2xl p-4 flex items-start justify-between gap-3"
               >
-                <Link to={`/?shelf=${s.id}`} className="flex-1 min-w-0">
-                  <div className="font-display text-[20px] text-ink lowercase leading-tight">
-                    {s.name.toLowerCase()}
-                  </div>
-                  {s.description && (
-                    <div className="text-[12px] text-ink-soft italic lowercase mt-0.5">
-                      {s.description.toLowerCase()}
+                <div className="flex-1 min-w-0">
+              <Link to={`/?shelf=${s.id}`} className="flex-1 min-w-0">
+                    <div className="font-display text-[20px] text-ink lowercase leading-tight">
+                      {s.name.toLowerCase()}
                     </div>
-                  )}
-                  <div className="text-[10px] text-ink-mute lowercase tracking-[0.08em] mt-1">
-                    {s.count} {s.count === 1 ? "bottle" : "bottles"}
-                  </div>
-                </Link>
+                    {s.description && (
+                      <div className="text-[12px] text-ink-soft italic lowercase mt-0.5">
+                        {s.description.toLowerCase()}
+                      </div>
+                    )}
+                    <div className="text-[10px] text-ink-mute lowercase tracking-[0.08em] mt-1">
+                      {s.count} {s.count === 1 ? "bottle" : "bottles"}
+                    </div>
+                  </Link>
+                  <button
+                    onClick={() => toggleShared(s)}
+                    className={`mt-2 text-[10px] lowercase tracking-wide rounded-full px-2.5 py-1 border transition-colors ${
+                      s.is_shared
+                        ? "bg-ink text-paper border-ink"
+                        : "border-rule/60 text-ink-mute hover:text-ink"
+                    }`}
+                  >
+                    {s.is_shared ? "shared with followers" : "private · tap to share"}
+                  </button>
+                </div>
                 <button
                   onClick={() => remove(s.id)}
                   className="text-ink-mute hover:text-destructive shrink-0"

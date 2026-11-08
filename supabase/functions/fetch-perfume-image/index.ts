@@ -59,7 +59,7 @@ async function verifyBottle(
         model: "claude-sonnet-5",
         max_tokens: 512,
         system:
-          "You are a strict product-image verifier for a luxury perfume catalog. Your FIRST and most important check: is there a perfume/fragrance bottle clearly visible as the main subject of this image? If NO perfume bottle is visible, reject immediately — do not consider anything else. APPROVE only if ALL of these are true: (1) a perfume bottle is the clear main subject, (2) the image looks like professional e-commerce or brand photography — clean/neutral/white background or tasteful styled shoot, professionally lit, (3) no people, hands, fingers, faces, or body parts anywhere in the image, (4) it is not a book cover, product packaging flat lay without a bottle, lifestyle shot, screenshot, collage, or any non-bottle subject. REJECT immediately if: no perfume bottle visible, any person or body part present, book cover, magazine page, random object, cluttered home setting, blurry or low quality. The bottle label text must match or plausibly match the requested perfume name. When in doubt, reject. Return a JSON object with: has_perfume_bottle (boolean — is there actually a perfume bottle in this image?), is_correct_bottle (boolean), is_single_bottle (boolean), contains_person_or_hand (boolean), is_professional_quality (boolean), visible_label_text (string), reason (string).",
+          "You are a strict product-image verifier for a luxury perfume catalog. Your FIRST and most important check: is there a perfume/fragrance product (a bottle, or its retail container such as a solid-perfume tin/compact, roll-on, or vial) clearly visible as the main subject of this image? If NO such product is visible, reject immediately — do not consider anything else. APPROVE only if ALL of these are true: (1) a perfume bottle is the clear main subject, (2) the image looks like professional e-commerce or brand photography — clean/neutral/white background or tasteful styled shoot, professionally lit, (3) no people, hands, fingers, faces, or body parts anywhere in the image, (4) it is not a book cover, product packaging flat lay without a bottle, lifestyle shot, screenshot, collage, or any non-bottle subject. REJECT immediately if: no perfume bottle visible, any person or body part present, book cover, magazine page, random object, cluttered home setting, blurry or low quality. The bottle label text must match or plausibly match the requested perfume name. When in doubt, reject. Return a JSON object with: has_perfume_bottle (boolean — is there actually a perfume bottle in this image?), is_correct_bottle (boolean), is_single_bottle (boolean), contains_person_or_hand (boolean), is_professional_quality (boolean), visible_label_text (string), reason (string).",
         messages: [
           {
             role: "user",
@@ -110,15 +110,27 @@ async function verifyBottle(
   }
 }
 
-// Ask Claude to find the product photo itself, using its built-in web search
-// tool (runs server-side on Anthropic's infra — no scraping, nothing to get
-// blocked by site bot-protection).
-async function webSearchImage(
+function ogImage(html: string, baseUrl: string): string | null {
+  const m =
+    html.match(/<meta[^>]+property=["']og:image["'][^>]+content=["']([^"']+)["']/i) ||
+    html.match(/<meta[^>]+content=["']([^"']+)["'][^>]+property=["']og:image["']/i);
+  if (!m) return null;
+  try {
+    return new URL(m[1].replace(/&amp;/g, "&"), baseUrl).href;
+  } catch {
+    return null;
+  }
+}
+
+// Ask Claude (with its server-side web search tool, so nothing to get blocked
+// by bot protection) to locate the Fragrantica page and/or an official or
+// retailer product page, then turn those into candidate image URLs.
+async function findCandidates(
   name: string,
   house: string,
-): Promise<{ url: string; source: string } | null> {
+): Promise<{ url: string; source: string }[]> {
   const ANTHROPIC_API_KEY = Deno.env.get("ANTHROPIC_API_KEY");
-  if (!ANTHROPIC_API_KEY) return null;
+  if (!ANTHROPIC_API_KEY) return [];
   try {
     const r = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
@@ -134,7 +146,7 @@ async function webSearchImage(
         thinking: { type: "disabled" },
         tools: [{ type: "web_search_20250305", name: "web_search", max_uses: 3 }],
         system:
-          "Use web search to find the Fragrantica page for the given perfume (URL looks like https://www.fragrantica.com/perfume/<House>/<Name>-<numeric id>.html). Make sure it is the exact perfume and concentration requested, not a flanker. Respond with ONLY a JSON object: {\"fragrantica_url\": \"<the page url>\"} — or {\"fragrantica_url\": null} if you cannot find it. No other text.",
+          "Use web search to locate pages for the given perfume. Find (a) its Fragrantica page, if one exists (URL looks like https://www.fragrantica.com/perfume/<House>/<Name>-<numeric id>.html), and (b) one product page for it on the brand's own website or a reputable retailer (not a marketplace like eBay or Poshmark). Make sure it is the exact perfume requested, not a flanker or different format. Respond with ONLY a JSON object: {\"fragrantica_url\": <url or null>, \"product_url\": <url or null>}. No other text.",
         messages: [
           {
             role: "user",
@@ -144,9 +156,8 @@ async function webSearchImage(
       }),
     });
     if (!r.ok) {
-      const t = await r.text();
-      console.warn("webSearchImage non-ok", r.status, t);
-      return null;
+      console.warn("findCandidates non-ok", r.status, await r.text());
+      return [];
     }
     const d = await r.json();
     const text = (d.content ?? [])
@@ -154,16 +165,36 @@ async function webSearchImage(
       .map((b: any) => b.text)
       .join("\n");
     const jsonMatch = text.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) return null;
+    if (!jsonMatch) return [];
     const parsed = JSON.parse(jsonMatch[0]);
+    console.log("findCandidates:", parsed);
+
+    const out: { url: string; source: string }[] = [];
     const idMatch = String(parsed.fragrantica_url ?? "").match(/-(\d+)\.html/);
-    if (!idMatch) return null;
-    const url = `https://fimgs.net/mdimg/perfume/375x500.${idMatch[1]}.jpg`;
-    console.log("webSearchImage found:", parsed.fragrantica_url, url);
-    return { url, source: "fragrantica" };
+    if (idMatch) {
+      out.push({ url: `https://fimgs.net/mdimg/perfume/375x500.${idMatch[1]}.jpg`, source: "fragrantica" });
+    }
+    if (typeof parsed.product_url === "string" && /^https?:\/\//.test(parsed.product_url)) {
+      try {
+        const pr = await fetch(parsed.product_url, {
+          headers: { "User-Agent": UA, "Accept": "text/html" },
+          redirect: "follow",
+          signal: AbortSignal.timeout(10_000),
+        });
+        if (pr.ok) {
+          const og = ogImage(await pr.text(), parsed.product_url);
+          if (og) out.push({ url: og, source: new URL(parsed.product_url).hostname.replace(/^www\./, "") });
+        } else {
+          console.warn("product page non-ok", pr.status, parsed.product_url);
+        }
+      } catch (e) {
+        console.warn("product page error", e);
+      }
+    }
+    return out;
   } catch (e) {
-    console.warn("webSearchImage error", e);
-    return null;
+    console.warn("findCandidates error", e);
+    return [];
   }
 }
 
@@ -187,27 +218,24 @@ serve(async (req) => {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
 
-    const found = await webSearchImage(name, h);
-    if (!found) {
-      console.log("webSearchImage returned nothing, giving up");
-      return respond(null);
+    const candidates = await findCandidates(name, h);
+    for (const c of candidates) {
+      const img = await fetchImageBytes(c.url);
+      if (!img) {
+        console.warn("could not download candidate image:", c.url);
+        continue;
+      }
+      const verdict = await verifyBottle(toBase64(img.bytes), img.contentType, name, h);
+      if (!verdict.ok) {
+        console.warn("candidate failed verification:", c.url, verdict.reason);
+        continue;
+      }
+      console.log("SUCCESS", c.source, c.url);
+      return respond(c.url, c.source);
     }
 
-    const img = await fetchImageBytes(found.url);
-    if (!img) {
-      console.warn("could not download candidate image:", found.url);
-      return respond(null);
-    }
-
-    const b64 = toBase64(img.bytes);
-    const verdict = await verifyBottle(b64, img.contentType, name, h);
-    if (!verdict.ok) {
-      console.warn("candidate image failed verification:", found.url, verdict.reason);
-      return respond(null);
-    }
-
-    console.log("SUCCESS", found.source, found.url);
-    return respond(found.url, found.source);
+    console.log("no usable image found");
+    return respond(null);
   } catch (e) {
     console.error("fetch-perfume-image error", e);
     return new Response(
