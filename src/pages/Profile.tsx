@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { ArrowLeft, Lock } from "lucide-react";
+import { toast } from "sonner";
 import AppShell from "@/components/AppShell";
 import FollowButton, { FollowStatus } from "@/components/FollowButton";
 import { supabase } from "@/lib/supabase";
@@ -15,6 +16,7 @@ type PublicProfile = {
   following_count: number;
   follow_status: FollowStatus;
   can_view: boolean;
+  is_blocked: boolean;
 };
 
 type SharedShelf = { id: string; name: string; description: string | null; perfume_count: number };
@@ -48,25 +50,73 @@ export default function Profile() {
   const [shelves, setShelves] = useState<SharedShelf[]>([]);
   const [openShelf, setOpenShelf] = useState<string | null>(null);
   const [shelfPerfumes, setShelfPerfumes] = useState<Record<string, SharedPerfume[]>>({});
+  const [reporting, setReporting] = useState(false);
+  const [reason, setReason] = useState<string>("");
+  const [details, setDetails] = useState("");
+  const [sending, setSending] = useState(false);
+
+  const load = async () => {
+    if (!username) return;
+    const { data } = await supabase.rpc("get_public_profile", { p_username: username });
+    const p = ((data as PublicProfile[]) ?? [])[0] ?? null;
+    setProfile(p);
+    if (p?.can_view) {
+      const [{ data: w }, { data: s }] = await Promise.all([
+        supabase.rpc("get_wearing_today", { p_user: p.id }),
+        supabase.rpc("get_profile_shelves", { p_user: p.id }),
+      ]);
+      setWearing(((w as Wearing[]) ?? [])[0] ?? null);
+      setShelves((s as SharedShelf[]) ?? []);
+    } else {
+      setWearing(null);
+      setShelves([]);
+    }
+    setLoading(false);
+  };
 
   useEffect(() => {
-    if (!username) return;
     setLoading(true);
-    (async () => {
-      const { data } = await supabase.rpc("get_public_profile", { p_username: username });
-      const p = ((data as PublicProfile[]) ?? [])[0] ?? null;
-      setProfile(p);
-      if (p?.can_view) {
-        const [{ data: w }, { data: s }] = await Promise.all([
-          supabase.rpc("get_wearing_today", { p_user: p.id }),
-          supabase.rpc("get_profile_shelves", { p_user: p.id }),
-        ]);
-        setWearing(((w as Wearing[]) ?? [])[0] ?? null);
-        setShelves((s as SharedShelf[]) ?? []);
-      }
-      setLoading(false);
-    })();
+    load();
   }, [username]);
+
+  const blockUser = async () => {
+    if (!user || !profile) return;
+    if (!confirm(`block @${profile.username}? they won't be able to find you or see your shelves.`)) return;
+    const { error } = await supabase.from("blocks").insert({ blocker_id: user.id, blocked_id: profile.id });
+    if (error) return toast.error(error.message);
+    toast.success("blocked.");
+    setReporting(false);
+    load();
+  };
+
+  const unblockUser = async () => {
+    if (!user || !profile) return;
+    const { error } = await supabase
+      .from("blocks")
+      .delete()
+      .eq("blocker_id", user.id)
+      .eq("blocked_id", profile.id);
+    if (error) return toast.error(error.message);
+    toast.success("unblocked.");
+    load();
+  };
+
+  const sendReport = async () => {
+    if (!user || !profile || !reason) return;
+    setSending(true);
+    const { error } = await supabase.from("reports").insert({
+      reporter_id: user.id,
+      reported_id: profile.id,
+      reason,
+      details: details.trim() || null,
+    });
+    setSending(false);
+    if (error) return toast.error(error.message);
+    toast.success("thanks — we'll take a look.");
+    setReporting(false);
+    setReason("");
+    setDetails("");
+  };
 
   const toggleShelf = async (id: string) => {
     if (openShelf === id) return setOpenShelf(null);
@@ -133,12 +183,14 @@ export default function Profile() {
                   {profile.follower_count} followers · {profile.following_count} following
                 </div>
               </div>
-              <FollowButton
-                targetId={profile.id}
-                status={profile.follow_status}
-                isPrivate={profile.is_private_account}
-                onChange={onFollowChange}
-              />
+              {!profile.is_blocked && (
+                <FollowButton
+                  targetId={profile.id}
+                  status={profile.follow_status}
+                  isPrivate={profile.is_private_account}
+                  onChange={onFollowChange}
+                />
+              )}
             </div>
 
             {isMe && (
@@ -150,7 +202,17 @@ export default function Profile() {
               </p>
             )}
 
-            {!profile.can_view ? (
+            {profile.is_blocked ? (
+              <div className="mt-10 bg-card border border-rule/40 rounded-2xl p-6 text-center space-y-3">
+                <p className="text-[13px] text-ink-soft lowercase">you've blocked @{profile.username}.</p>
+                <button
+                  onClick={unblockUser}
+                  className="h-9 px-4 rounded-full border border-rule/60 text-ink text-[12px] lowercase hover:bg-muted/60"
+                >
+                  unblock
+                </button>
+              </div>
+            ) : !profile.can_view ? (
               <div className="mt-10 bg-card border border-rule/40 rounded-2xl p-6 text-center">
                 <Lock className="w-4 h-4 mx-auto text-ink-mute mb-2" strokeWidth={1.5} />
                 <p className="text-[13px] text-ink-soft lowercase">
@@ -223,6 +285,60 @@ export default function Profile() {
                   )}
                 </section>
               </>
+            )}
+
+            {!isMe && !profile.is_blocked && (
+              <section className="mt-10 pt-6 border-t border-rule/40">
+                {!reporting ? (
+                  <div className="flex gap-4 text-[12px] lowercase text-ink-mute">
+                    <button onClick={() => setReporting(true)} className="hover:text-ink">
+                      report
+                    </button>
+                    <button onClick={blockUser} className="hover:text-destructive">
+                      block
+                    </button>
+                  </div>
+                ) : (
+                  <div className="bg-card border border-rule/40 rounded-2xl p-4 space-y-3">
+                    <div className="text-[13px] text-ink lowercase">what's wrong with @{profile.username}?</div>
+                    <div className="flex flex-wrap gap-1.5">
+                      {["spam", "harassment", "inappropriate", "impersonation", "other"].map((r) => (
+                        <button
+                          key={r}
+                          onClick={() => setReason(r)}
+                          className={`h-8 px-3.5 rounded-full text-[12px] lowercase transition-colors ${
+                            reason === r ? "bg-ink text-paper" : "border border-rule/60 text-ink-soft hover:text-ink"
+                          }`}
+                        >
+                          {r}
+                        </button>
+                      ))}
+                    </div>
+                    <textarea
+                      value={details}
+                      onChange={(e) => setDetails(e.target.value)}
+                      maxLength={1000}
+                      placeholder="anything else we should know (optional)"
+                      className="w-full bg-paper border border-rule/40 rounded-xl p-3 text-[13px] min-h-[80px]"
+                    />
+                    <div className="flex gap-2">
+                      <button
+                        onClick={sendReport}
+                        disabled={!reason || sending}
+                        className="h-9 px-4 rounded-full bg-ink text-paper text-[12px] lowercase disabled:opacity-40"
+                      >
+                        {sending ? "sending…" : "send report"}
+                      </button>
+                      <button
+                        onClick={() => setReporting(false)}
+                        className="h-9 px-4 rounded-full border border-rule/60 text-ink-soft text-[12px] lowercase"
+                      >
+                        cancel
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </section>
             )}
           </>
         )}

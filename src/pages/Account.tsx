@@ -110,6 +110,10 @@ export default function Account() {
   const [isPrivate, setIsPrivate] = useState(false);
   const [shareWearing, setShareWearing] = useState(false);
   const [savingUsername, setSavingUsername] = useState(false);
+  const [blocked, setBlocked] = useState<{ id: string; username: string | null; full_name: string | null }[]>([]);
+  const [showDelete, setShowDelete] = useState(false);
+  const [confirmText, setConfirmText] = useState("");
+  const [deleting, setDeleting] = useState(false);
   const [backfill, setBackfill] = useState<{ done: number; total: number } | null>(null);
 
   useEffect(() => {
@@ -150,6 +154,39 @@ export default function Account() {
     } else {
       toast({ title: "saved", description: "your taste profile is updated" });
     }
+  }
+
+  useEffect(() => {
+    if (!user) return;
+    supabase.rpc("get_blocked_list").then(({ data }: any) => setBlocked(data ?? []));
+  }, [user]);
+
+  async function unblock(id: string) {
+    if (!user) return;
+    const { error } = await supabase.from("blocks").delete().eq("blocker_id", user.id).eq("blocked_id", id);
+    if (error) {
+      toast({ title: "couldn't unblock", description: error.message, variant: "destructive" });
+      return;
+    }
+    setBlocked((b) => b.filter((x) => x.id !== id));
+  }
+
+  async function deleteAccount() {
+    if (confirmText.trim().toLowerCase() !== "delete") return;
+    setDeleting(true);
+    const { data, error } = await supabase.functions.invoke("delete-account", {
+      body: { confirm: "delete" },
+    });
+    if (error || (data as any)?.error) {
+      setDeleting(false);
+      toast({
+        title: "couldn't delete your account",
+        description: (data as any)?.error ?? error?.message,
+        variant: "destructive",
+      });
+      return;
+    }
+    await signOut();
   }
 
   async function saveUsername() {
@@ -440,6 +477,24 @@ export default function Account() {
               </Link>
             )}
           </div>
+          {blocked.length > 0 && (
+            <div className="space-y-2 pt-1">
+              <div className="text-[11px] lowercase text-ink-soft">blocked accounts</div>
+              {blocked.map((b) => (
+                <div key={b.id} className="flex items-center justify-between gap-3">
+                  <div className="text-[13px] text-ink lowercase truncate">
+                    {b.username ? `@${b.username}` : "someone"}
+                  </div>
+                  <button
+                    onClick={() => unblock(b.id)}
+                    className="text-[11px] lowercase text-ink-soft hover:text-ink underline shrink-0"
+                  >
+                    unblock
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
         </section>
 
         {/* THEME PICKER */}
@@ -505,6 +560,51 @@ export default function Account() {
         >
           sign out
         </Button>
+
+        <section className="pt-4">
+          {!showDelete ? (
+            <button
+              onClick={() => setShowDelete(true)}
+              className="w-full text-center text-[12px] lowercase text-ink-mute hover:text-destructive"
+            >
+              delete my account
+            </button>
+          ) : (
+            <div className="bg-card border border-destructive/40 rounded-2xl p-4 space-y-3">
+              <div className="text-[13px] text-ink lowercase">delete everything?</div>
+              <p className="text-[12px] text-ink-soft lowercase">
+                this permanently removes your account, collection, shelves, diary, photos and follows. it can't be
+                undone. type <span className="text-ink">delete</span> to confirm.
+              </p>
+              <Input
+                value={confirmText}
+                onChange={(e) => setConfirmText(e.target.value)}
+                placeholder="delete"
+                className="h-10 text-[14px]"
+              />
+              <div className="flex gap-2">
+                <Button
+                  onClick={deleteAccount}
+                  disabled={deleting || confirmText.trim().toLowerCase() !== "delete"}
+                  variant="destructive"
+                  className="flex-1 h-10 rounded-full text-[12px] lowercase"
+                >
+                  {deleting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : "delete forever"}
+                </Button>
+                <Button
+                  onClick={() => {
+                    setShowDelete(false);
+                    setConfirmText("");
+                  }}
+                  variant="outline"
+                  className="h-10 rounded-full border-rule/60 text-[12px] lowercase"
+                >
+                  cancel
+                </Button>
+              </div>
+            </div>
+          )}
+        </section>
       </div>
     </AppShell>
   );
